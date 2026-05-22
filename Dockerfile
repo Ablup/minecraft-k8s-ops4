@@ -1,4 +1,4 @@
-FROM itzg/minecraft-server:java17-stable
+FROM itzg/minecraft-server:java17
 
 ENV MOTD="Abram Gallup's Server"
 ENV EULA="TRUE"
