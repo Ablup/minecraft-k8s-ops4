@@ -1,0 +1,59 @@
+name: Build and Push Minecraft to ECR
+on:
+  push:
+    tags:
+      - 'v*' # Triggers on v1.0, v1.1, etc.
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: minecraft-repo 
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Tag Image
+        run: |
+          docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.ref_name }} .
+          docker tag ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.ref_name }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+      - name: Smoke Test
+        run: |
+          docker run -d --name test-server -e EULA=TRUE ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.ref_name }}
+          
+          PASSED=false
+          for i in {1..12}; do
+            if docker logs test-server 2>&1 | grep -q "Done"; then
+              echo "Smoke test passed on attempt $i!"
+              PASSED=true
+              break
+            fi
+            echo "Attempt $i: Server not ready yet..."
+            sleep 10
+          done
+
+          docker stop test-server
+          if [ "$PASSED" = false ]; then
+            echo "Server failed to reach 'Done' state within 2 minutes"
+            exit 1
+          fi
+
+      - name: Push to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.ref_name }}
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
