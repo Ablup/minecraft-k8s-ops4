@@ -23,7 +23,7 @@ spec:
         - name: regcred 
       containers:
       - name: minecraft
-        image: 654654227412.dkr.ecr.us-east-1.amazonaws.com/minecraft-repo:v1.0.3
+        image: 654654227412.dkr.ecr.us-east-1.amazonaws.com/minecraft-repo:v1.0.8
         ports:
         - containerPort: 25565
           name: mc-port
